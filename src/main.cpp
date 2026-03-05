@@ -3,8 +3,10 @@
 #include <Geode/utils/web.hpp>
 #include <random>
 #include <regex>
+#include <filesystem>
 
 using namespace geode::prelude;
+namespace fs = std::filesystem;
 
 class $modify(MyPlayLayer, PlayLayer) {
     struct Fields {
@@ -25,7 +27,7 @@ class $modify(MyPlayLayer, PlayLayer) {
             auto saveDir = Mod::get()->getSaveDir();
             auto roastFile = saveDir / "roasts.txt";
 
-            if (!ghc::filesystem::exists(roastFile)) {
+            if (!fs::exists(roastFile)) {
                 std::string defaultRoasts = 
                     "bro died at {}%... skill issue 💀 ()\n"
                     "certified choking hazard at {}% on [] 🙏\n"
@@ -77,7 +79,7 @@ class $modify(MyPlayLayer, PlayLayer) {
             }
 
             auto congratsFile = saveDir / "congrats.txt";
-            if (!ghc::filesystem::exists(congratsFile)) {
+            if (!fs::exists(congratsFile)) {
                 std::string defaultCongrats = 
                     "GG WP! () beat []! 🥂\n"
                     "massive W on [] after <> attempts! 😭\n";
@@ -205,7 +207,6 @@ class $modify(MyPlayLayer, PlayLayer) {
 
         auto path = Mod::get()->getSaveDir() / "ss.png";
 
-        
         if (!img->saveToFile(path.string().c_str())) {
             img->release();
             return;
@@ -217,7 +218,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         
         auto fileRes = form.file("file", path);
         if (fileRes.isErr()) {
-            (void)ghc::filesystem::remove(path);
+            (void)fs::remove(path);
             return;
         }
 
@@ -227,7 +228,7 @@ class $modify(MyPlayLayer, PlayLayer) {
             .post(webhook);
 
         m_fields->m_task.spawn(std::move(req), [path](utils::web::WebResponse res) {
-            (void)ghc::filesystem::remove(path);
+            (void)fs::remove(path);
             if (res.ok()) {
                 log::info("sent to discord");
             } else {
