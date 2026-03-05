@@ -207,11 +207,10 @@ class $modify(MyPlayLayer, PlayLayer) {
 
         auto path = Mod::get()->getSaveDir() / "ss.png";
 
-        if (!img->saveToFile(path.string().c_str())) {
-            img->release();
-            return;
-        }
+        auto imageSaved = utils::file::writeBinary(path, img->getData(), img->getDataLen());
         img->release();
+        
+        if (imageSaved.isErr()) return;
 
         utils::web::MultipartForm form;
         form.param("content", finalMessage);
