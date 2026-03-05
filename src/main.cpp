@@ -2,6 +2,7 @@
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/utils/web.hpp>
 #include <random>
+#include <fstream>
 #include <filesystem>
 #include <chrono>
 #include <thread>
@@ -23,66 +24,62 @@ class $modify(MyPlayLayer, PlayLayer) {
             m_fields->m_rng = std::mt19937(rd());
             auto roastFile = Mod::get()->getSaveDir() / "roasts.txt";
             if (!fs::exists(roastFile)) {
-                std::string defaults =
-                    "bro died at {}%... skill issue 💀 ()\n"
-                    "certified choking hazard at {}% on [] 🙏\n"
-                    "{}% and still trash lmao get gud ()\n"
-                    "bro really thought he had it but died at {}% 😭\n"
-                    "imagine getting to {}% just to choke like that 🙏\n"
-                    "{}%... my grandma plays better with one hand 💀\n"
-                    "another day, another {}% fail. consistency in being trash is crazy 🥂\n"
-                    "bro is allergic to 100%, currently stuck at {}% 💀\n"
-                    "{}%? yeah just delete the game at this point fr 🙏\n"
-                    "certified {}% moment. seek help 😭\n"
-                    "ok but who actually dies at {}%? oh wait, you do 💀\n"
-                    "bro's heartbeat peaked just to fail at {}%... tragic 🙏\n"
-                    "{}%... i'd be embarrassed to let the webhook even send this 🥂\n"
-                    "bro really saw {}% and decided to stop breathing 💀\n"
-                    "nice {}% fail bro, keep it up and you'll reach 100% by 2030 🙏\n"
-                    "i've seen better gameplay from a literal rock. {}%? embarrassing 😭\n"
-                    "{}%... is your monitor even turned on? 💀\n"
-                    "bro clicked 0.0001s too late at {}% and lost his soul 🙏\n"
-                    "invest in a better gaming chair if you're dying at {}% 🥂\n"
-                    "{}%? yeah i'm telling the whole server you're washed 💀\n"
-                    "{}%? my cat could do better and he doesn't even have thumbs 😭 ()\n"
-                    "bro really choked at {}% on []... just uninstall already 💀\n"
-                    "{}%... i've seen bot accounts with better consistency 🙏\n"
-                    "imagine dying at {}% in 2026 🥂\n"
-                    "{}% is crazy. seek professional help 💀\n"
-                    "bro's heart rate went to 200 just to fail at {}% 😭 ()\n"
-                    "{}%... i'd rather watch paint dry than this gameplay 💀\n"
-                    "bro really hit the pause button on life at {}% 🙏\n"
-                    "{}%? yeah that's going in the fail compilation 🥂\n"
-                    "certified {}% enjoyer. stay bad bro 😭 ()\n"
-                    "{}%... even the level is laughing at you 💀\n"
-                    "bro's gaming chair clearly isn't expensive enough for {}% 🙏\n"
-                    "{}% is the new 100% for people who can't play 🥂\n"
-                    "imagine being this consistent at failing at {}% 😭\n"
-                    "{}%... i'm deleting the webhook so i don't have to see this trash 💀\n"
-                    "bro really thought he was him until {}% happened 🙏 ()\n"
-                    "meow"\n;
-                (void)utils::file::writeString(roastFile, defaults);
+                std::ofstream file(roastFile);
+                file << "bro died at {}%... skill issue 💀 ()\n";
+                file << "certified choking hazard at {}% on [] 🙏\n";
+                file << "{}% and still trash lmao get gud ()\n";
+                file << "bro really thought he had it but died at {}% 😭\n";
+                file << "imagine getting to {}% just to choke like that 🙏\n";
+                file << "{}%... my grandma plays better with one hand 💀\n";
+                file << "another day, another {}% fail. consistency in being trash is crazy 🥂\n";
+                file << "bro is allergic to 100%, currently stuck at {}% 💀\n";
+                file << "{}%? yeah just delete the game at this point fr 🙏\n";
+                file << "certified {}% moment. seek help 😭\n";
+                file << "ok but who actually dies at {}%? oh wait, you do 💀\n";
+                file << "bro's heartbeat peaked just to fail at {}%... tragic 🙏\n";
+                file << "{}%... i'd be embarrassed to let the webhook even send this 🥂\n";
+                file << "bro really saw {}% and decided to stop breathing 💀\n";
+                file << "nice {}% fail bro, keep it up and you'll reach 100% by 2030 🙏\n";
+                file << "i've seen better gameplay from a literal rock. {}%? embarrassing 😭\n";
+                file << "{}%... is your monitor even turned on? 💀\n";
+                file << "bro clicked 0.0001s too late at {}% and lost his soul 🙏\n";
+                file << "invest in a better gaming chair if you're dying at {}% 🥂\n";
+                file << "{}%? yeah i'm telling the whole server you're washed 💀\n";
+                file << "{}%? my cat could do better and he doesn't even have thumbs 😭 ()\n";
+                file << "bro really choked at {}% on []... just uninstall already 💀\n";
+                file << "{}%... i've seen bot accounts with better consistency 🙏\n";
+                file << "imagine dying at {}% in 2026 🥂\n";
+                file << "{}% is crazy. seek professional help 💀\n";
+                file << "bro's heart rate went to 200 just to fail at {}% 😭 ()\n";
+                file << "{}%... i'd rather watch paint dry than this gameplay 💀\n";
+                file << "bro really hit the pause button on life at {}% 🙏\n";
+                file << "{}%? yeah that's going in the fail compilation 🥂\n";
+                file << "certified {}% enjoyer. stay bad bro 😭 ()\n";
+                file << "{}%... even the level is laughing at you 💀\n";
+                file << "bro's gaming chair clearly isn't expensive enough for {}% 🙏\n";
+                file << "{}% is the new 100% for people who can't play 🥂\n";
+                file << "imagine being this consistent at failing at {}% 😭\n";
+                file << "{}%... i'm deleting the webhook so i don't have to see this trash 💀\n";
+                file << "bro really thought he was him until {}% happened 🙏 ()\n"
+                    "meow\n";
+                file.close();
             }
-            auto rResult = utils::file::readString(roastFile);
-            if (rResult) {
-                std::stringstream rss(rResult.unwrap());
-                std::string rLine;
-                while (std::getline(rss, rLine))
-                    if (!rLine.empty()) m_fields->m_roasts.push_back(rLine);
+            std::ifstream rFile(roastFile);
+            std::string rLine;
+            while (std::getline(rFile, rLine)) {
+                if (!rLine.empty()) m_fields->m_roasts.push_back(rLine);
             }
             auto congratsFile = Mod::get()->getSaveDir() / "congrats.txt";
             if (!fs::exists(congratsFile)) {
-                (void)utils::file::writeString(congratsFile,
-                    "GG WP! () beat []! 🥂\n"
-                    "massive W on [] after <> attempts! 😭\n"
-                );
+                std::ofstream file(congratsFile);
+                file << "GG WP! () beat []! 🥂\n";
+                file << "massive W on [] after <> attempts! 😭\n";
+                file.close();
             }
-            auto cResult = utils::file::readString(congratsFile);
-            if (cResult) {
-                std::stringstream css(cResult.unwrap());
-                std::string cLine;
-                while (std::getline(css, cLine))
-                    if (!cLine.empty()) m_fields->m_congrats.push_back(cLine);
+            std::ifstream cFile(congratsFile);
+            std::string cLine;
+            while (std::getline(cFile, cLine)) {
+                if (!cLine.empty()) m_fields->m_congrats.push_back(cLine);
             }
             m_fields->m_loaded = true;
         }
@@ -181,7 +178,7 @@ class $modify(MyPlayLayer, PlayLayer) {
             Loader::get()->queueInMainThread([this, path, finalMessage, webhook]() {
                 utils::web::MultipartForm form;
                 form.param("content", finalMessage);
-                auto file = form.file("file", path.string(), "image/png");
+                auto file = form.file("file", path, "image/png");
                 if (file.isErr()) {
                     fs::remove(path);
                     return;
@@ -202,4 +199,4 @@ class $modify(MyPlayLayer, PlayLayer) {
         }).detach();
     }
 };
-// hi jasmin if ur reviewing this
+// hi whoever is reviewing this
