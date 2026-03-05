@@ -182,7 +182,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         std::string finalMessage = formatCustomMessage(rawMessage, percent);
 
         auto winSize = CCDirector::sharedDirector()->getWinSize();
-        auto renderer = CCRenderTexture::create((int)winSize.width, (int)winSize.height);
+        auto renderer = CCRenderTexture::create(static_cast<int>(winSize.width), static_cast<int>(winSize.height));
         if (!renderer) return;
 
         renderer->begin();
@@ -194,7 +194,7 @@ class $modify(MyPlayLayer, PlayLayer) {
 
         auto path = Mod::get()->getSaveDir() / "ss.png";
         
-        if (!utils::cocos::saveImage(img, path)) {
+        if (!img->saveToFile(path.string().c_str(), false)) {
             img->release();
             return;
         }
@@ -206,7 +206,8 @@ class $modify(MyPlayLayer, PlayLayer) {
 
         auto req = utils::web::WebRequest();
         m_fields->m_task.setResponse([path](utils::web::WebResponse* res) {
-            (void)fs::remove(path);
+            std::error_code ec;
+            fs::remove(path, ec);
             if (res->isSuccess()) {
                 log::info("sent to discord");
             } else {
