@@ -2,15 +2,6 @@
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/utils/web.hpp>
 
-#include <random>
-#include <fstream>
-#include <filesystem>
-#include <chrono>
-#include <thread>
-#include <vector>
-#include <string>
-#include <iterator>
-
 using namespace geode::prelude;
 namespace fs = std::filesystem;
 
@@ -19,25 +10,33 @@ class $modify(MyPlayLayer, PlayLayer) {
         std::vector<std::string> m_roasts;
         std::vector<std::string> m_congrats;
         bool m_loaded = false;
-
+        
         async::TaskHolder<utils::web::WebResponse> m_task;
-
-        std::mt19937 m_rng;
-
+        
+        Ref<CCRenderTexture> m_renderTexture;
+        
+        utils::random::Generator m_rng;
+        
         int m_lastDeathPercent = -1;
         int m_deathsAtSamePercent = 0;
-        std::chrono::steady_clock::time_point m_firstDeathAtPercentTime;
-
+        asp::time::Instant m_firstDeathAtPercentTime;
+        
         std::string m_pendingStuckMessage;
     };
-
-    bool init(GJGameLevel* level, bool useReplay, bool dontSave) {
-        if (!PlayLayer::init(level, useReplay, dontSave)) return false;
-
+    
+    bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
+        if (!PlayLayer::init(level, useReplay, dontCreateObjects)) return false;
+        
+        auto size = CCDirector::sharedDirector()->getWinSize();
+        m_fields->m_renderTexture = CCRenderTexture::create((int)size.width, (int)size.height);
+        
+        return true;
+    }
+    
+    void setupHasCompleted() {
+        PlayLayer::setupHasCompleted();
+        
         if (!m_fields->m_loaded) {
-            std::random_device rd;
-            m_fields->m_rng = std::mt19937(rd());
-
             auto roastFile = Mod::get()->getSaveDir() / "roasts.txt";
             m_fields->m_roasts = {
                 "bro died at {}%... skill issue 💀 ()",
@@ -64,7 +63,7 @@ class $modify(MyPlayLayer, PlayLayer) {
                 "bro really choked at {}% on []... just uninstall already 💀",
                 "{}%... i've seen bot accounts with better consistency 🙏",
                 "imagine dying at {}% in 2026 🥂",
-                "{}% is crazy. seek professional help 💀",
+                "{}% is crazy. xseek professional help 💀",
                 "bro's heart rate went to 200 just to fail at {}% 😭 ()",
                 "{}%... i'd rather watch paint dry than this gameplay 💀",
                 "bro really hit the pause button on life at {}% 🙏",
@@ -77,52 +76,68 @@ class $modify(MyPlayLayer, PlayLayer) {
                 "{}%... i'm deleting the webhook so i don't have to see this trash 💀",
                 "bro really thought he was him until {}% happened 🙏 ()",
             };
-
+            
             if (!fs::exists(roastFile)) {
-                std::ofstream f(roastFile);
-                for (auto& r : m_fields->m_roasts) f << r << "\n";
+                auto data = utils::string::join(m_fields->m_roasts, "\n");
+                (void)utils::file::writeString(roastFile, data);
             } else {
-                m_fields->m_roasts.clear();
-                std::ifstream rf(roastFile);
-                std::string l;
-                while (std::getline(rf, l)) if (!l.empty()) m_fields->m_roasts.push_back(l);
+                std::string content;
+                if (GEODE_UNWRAP_INTO_IF_OK(content, utils::file::readString(roastFile))) {
+                    auto lines = utils::string::split(content, "\n");
+                    m_fields->m_roasts.clear();
+                    
+                    for (auto& line : lines) {
+                        if (line.empty()) continue;
+                        std::string cleaned = utils::string::replace(line, "( )", "()");
+                        m_fields->m_roasts.push_back(cleaned);
+                    }
+                }
             }
-
+            
             auto congratsFile = Mod::get()->getSaveDir() / "congrats.txt";
             m_fields->m_congrats = {
                 "GG WP! () beat []! 🥂",
                 "massive W on [] after <> attempts! 😭"
             };
-
+            
             if (!fs::exists(congratsFile)) {
-                std::ofstream f(congratsFile);
-                for (auto& c : m_fields->m_congrats) f << c << "\n";
+                auto data = utils::string::join(m_fields->m_congrats, "\n");
+                (void)utils::file::writeString(congratsFile, data);
             } else {
-                m_fields->m_congrats.clear();
-                std::ifstream cf(congratsFile);
-                std::string l;
-                while (std::getline(cf, l)) if (!l.empty()) m_fields->m_congrats.push_back(l);
+                std::string content;
+                if (GEODE_UNWRAP_INTO_IF_OK(content, utils::file::readString(congratsFile))) {
+                    auto lines = utils::string::split(content, "\n");
+                    m_fields->m_congrats.clear();
+                    
+                    for (auto& line : lines) {
+                        if (line.empty()) continue;
+                        m_fields->m_congrats.push_back(line);
+                    }
+                }
             }
-
             m_fields->m_loaded = true;
         }
-
-        return true;
     }
-
+    
     void destroyPlayer(PlayerObject* player, GameObject* obj) {
-        bool bad = m_isPracticeMode || m_isTestMode || m_level->isPlatformer();
-
+        if (obj == m_anticheatSpike) {
+            PlayLayer::destroyPlayer(player, obj);
+            return;
+        }
+        
+        bool bad = m_isPracticeMode || m_isTestMode || m_isPlatformer;
+        
         if (bad || Mod::get()->getSettingValue<bool>("disable_roasts")) {
             PlayLayer::destroyPlayer(player, obj);
             return;
         }
-
+        
         int percent = getCurrentPercentInt();
-
+        m_fields->m_pendingStuckMessage.clear();
+        
         if (Mod::get()->getSettingValue<bool>("enable_stuck_messages")) {
-            auto now = std::chrono::steady_clock::now();
-
+            auto now = asp::time::Instant::now();
+            
             if (percent == m_fields->m_lastDeathPercent) {
                 m_fields->m_deathsAtSamePercent++;
             } else {
@@ -130,33 +145,28 @@ class $modify(MyPlayLayer, PlayLayer) {
                 m_fields->m_deathsAtSamePercent = 1;
                 m_fields->m_firstDeathAtPercentTime = now;
             }
-
-            m_fields->m_pendingStuckMessage.clear();
-
+            
             if (m_fields->m_deathsAtSamePercent > 5) {
-                auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
-                    now - m_fields->m_firstDeathAtPercentTime
-                ).count();
-
-                int h = elapsed / 3600;
-                int m = (elapsed % 3600) / 60;
-
-                std::string t =
-                    h >= 1 ? std::to_string(h) + " hour" + (h > 1 ? "s" : "")
-                           : std::to_string(m) + " minute" + (m != 1 ? "s" : "");
-
-                m_fields->m_pendingStuckMessage =
-                    "bro has been stuck at " + std::to_string(percent) +
+                auto elapsed = now.durationSince(m_fields->m_firstDeathAtPercentTime).seconds();
+                
+                if (elapsed >= 60) {
+                    int h = elapsed / 3600;
+                    int m = (elapsed % 3600) / 60;
+                    
+                    std::string t = h >= 1 ? utils::numToString(h) + " hour" + (h > 1 ? "s" : "")
+                    : utils::numToString(m) + " minute" + (m != 1 ? "s" : "");
+                    
+                    m_fields->m_pendingStuckMessage = "bro has been stuck at " + utils::numToString(percent) +
                     "% for " + t + " straight someone call a therapist";
+                }
             }
         }
-
+        
         auto minPercent = Mod::get()->getSettingValue<int64_t>("min_percent");
-        bool newBest = percent > m_level->m_normalPercent;
-
+        
         PlayLayer::destroyPlayer(player, obj);
-
-        if (newBest && percent >= minPercent) {
+        
+        if (percent >= minPercent) {
             this->getScheduler()->scheduleSelector(
                 schedule_selector(MyPlayLayer::captureAndSendRoast),
                 this, 0.1f, 0, 0.f, false
@@ -168,12 +178,11 @@ class $modify(MyPlayLayer, PlayLayer) {
             );
         }
     }
-
+    
     void levelComplete() {
-        bool bad = m_isPracticeMode || m_isTestMode || m_level->isPlatformer();
-
+        bool bad = m_isPracticeMode || m_isTestMode || m_isPlatformer;
         PlayLayer::levelComplete();
-
+        
         if (!bad) {
             this->getScheduler()->scheduleSelector(
                 schedule_selector(MyPlayLayer::captureAndSendCongrats),
@@ -181,157 +190,182 @@ class $modify(MyPlayLayer, PlayLayer) {
             );
         }
     }
-
+    
     void captureAndSendRoast(float) { sendToDiscord(false); }
     void captureAndSendCongrats(float) { sendToDiscord(true); }
-
+    
     std::string getResolutionString() {
         auto s = CCDirector::sharedDirector()->getWinSize();
-        return std::to_string((int)s.width) + "x" + std::to_string((int)s.height);
+        return utils::numToString((int)s.width) + "x" + utils::numToString((int)s.height);
     }
-
+    
     std::string formatCustomMessage(std::string msg, int percent) {
-        std::string user =
-            GJAccountManager::sharedState()->m_username.empty()
-                ? "Guest"
-                : GJAccountManager::sharedState()->m_username;
-
+        std::string user = GJAccountManager::sharedState()->m_username.empty()
+        ? "Guest"
+        : GJAccountManager::sharedState()->m_username;
+        
         std::string level = m_level->m_levelName;
-        std::string attempts = std::to_string(m_level->m_attempts);
-
+        std::string attempts = geode::utils::numToString(static_cast<int>(m_level->m_attempts));
+        
         std::string timeStr = fmt::format(
             "{:02}:{:02}",
-            (int)m_level->m_workingTime / 60,
-            (int)m_level->m_workingTime % 60
+            static_cast<int>(m_level->m_workingTime) / 60,
+            static_cast<int>(m_level->m_workingTime) % 60
         );
-
-        auto replaceAll = [](std::string& s, const std::string& f, const std::string& t) {
-            size_t p = 0;
-            while ((p = s.find(f, p)) != std::string::npos) {
-                s.replace(p, f.length(), t);
-                p += t.length();
-            }
-        };
-
-        replaceAll(msg, "()", user);
-        replaceAll(msg, "[]", level);
-        replaceAll(msg, "{}", std::to_string(percent));
-        replaceAll(msg, "<>", attempts);
-        replaceAll(msg, "!!", timeStr);
-        replaceAll(msg, "~~", getResolutionString());
-
+        
+        utils::string::replaceIP(msg, "()", user);
+        utils::string::replaceIP(msg, "[]", level);
+        utils::string::replaceIP(msg, "{}", utils::numToString(percent));
+        utils::string::replaceIP(msg, "<>", attempts);
+        utils::string::replaceIP(msg, "!!", timeStr);
+        utils::string::replaceIP(msg, "~~", getResolutionString());
+        
         return msg;
     }
-
+    
     void sendStuckMessageOnly(float) {
         if (!Mod::get()->getSettingValue<bool>("enable_stuck_messages")) return;
-
+        
         auto webhook = Mod::get()->getSettingValue<std::string>("webhook_url");
         if (webhook.empty() || m_fields->m_pendingStuckMessage.empty()) return;
-
+        
         std::string msg = m_fields->m_pendingStuckMessage;
         m_fields->m_pendingStuckMessage.clear();
-
+        
         utils::web::MultipartForm form;
         form.param("content", msg);
-
+        
         auto req = utils::web::WebRequest()
-            .bodyMultipart(form)
-            .timeout(std::chrono::seconds(15))
-            .post(webhook);
-
+        .bodyMultipart(form)
+        .timeout(std::chrono::seconds(15))
+        .post(webhook);
+        
         m_fields->m_task.spawn(std::move(req), [](utils::web::WebResponse res) {
             if (!res.ok()) log::error("webhook failed: {} code {}", res.errorMessage(), res.code());
         });
     }
-
+    
     void sendToDiscord(bool victory) {
         auto webhook = Mod::get()->getSettingValue<std::string>("webhook_url");
         if (webhook.empty()) return;
-
+        
         int percent = victory ? 100 : getCurrentPercentInt();
-
         std::string raw;
-        auto& rng = m_fields->m_rng;
-
+        
         if (victory) {
-            if (m_fields->m_congrats.empty()) raw = "GG! () just beat []! 🥂";
-            else {
-                std::uniform_int_distribution dis(0, (int)m_fields->m_congrats.size() - 1);
-                raw = m_fields->m_congrats[dis(rng)];
+            if (m_fields->m_congrats.empty()) {
+                raw = "GG! () just beat []! 🥂";
+            } else {
+                size_t index = m_fields->m_rng.generate<size_t>() % m_fields->m_congrats.size();
+                raw = m_fields->m_congrats[index];
             }
         } else {
-            if (m_fields->m_roasts.empty()) raw = "died at {}% lol get good";
-            else {
-                std::uniform_int_distribution dis(0, (int)m_fields->m_roasts.size() - 1);
-                raw = m_fields->m_roasts[dis(rng)];
+            if (m_fields->m_roasts.empty()) {
+                raw = "died at {}% lol get good";
+            } else {
+                size_t index = m_fields->m_rng.generate<size_t>() % m_fields->m_roasts.size();
+                raw = m_fields->m_roasts[index];
             }
         }
-
+        
         std::string finalMsg = formatCustomMessage(raw, percent);
-
+        
         if (!m_fields->m_pendingStuckMessage.empty()) {
             finalMsg += "\n" + m_fields->m_pendingStuckMessage;
             m_fields->m_pendingStuckMessage.clear();
         }
-
+        
         auto size = CCDirector::sharedDirector()->getWinSize();
-        auto rt = CCRenderTexture::create((int)size.width, (int)size.height);
-        if (!rt) return;
-
-        rt->beginWithClear(0,0,0,0);
-        this->visit();
-        rt->end();
-
-        auto img = rt->newCCImage(true);
-        if (!img) return;
-
-        auto tmp = (Mod::get()->getSaveDir() / "tmp_screenshot.png").string();
-
-        std::thread([this, img, tmp, webhook, finalMsg]() {
-
-            if (!img->saveToFile(tmp.c_str())) {
-                Loader::get()->queueInMainThread([img]() { img->release(); });
-                return;
+        int logicalWidth = static_cast<int>(size.width);
+        int logicalHeight = static_cast<int>(size.height);
+        
+        if (!m_fields->m_renderTexture || 
+            m_fields->m_renderTexture->getSprite()->getContentSize().width != logicalWidth || 
+            m_fields->m_renderTexture->getSprite()->getContentSize().height != logicalHeight) {
+                
+                m_fields->m_renderTexture = CCRenderTexture::create(logicalWidth, logicalHeight);
             }
+            
+            auto rt = m_fields->m_renderTexture;
+            if (!rt) return;
+            
+            auto texSize = rt->getSprite()->getTexture()->getContentSizeInPixels();
+            int pixelWidth = static_cast<int>(texSize.width);
+            int pixelHeight = static_cast<int>(texSize.height);
+            
 
-            Loader::get()->queueInMainThread([img]() { img->release(); });
-
-            std::ifstream f(tmp, std::ios::binary);
-            if (!f) {
-                fs::remove(tmp);
-                return;
-            }
-
-            std::vector<uint8_t> buf(
-                (std::istreambuf_iterator<char>(f)),
-                std::istreambuf_iterator<char>()
+            rt->beginWithClear(0, 0, 0, 0);
+            this->visit();
+            
+            auto rawData = std::make_shared<std::vector<GLubyte>>(pixelWidth * pixelHeight * 4);
+            
+            glPixelStorei(GL_PACK_ALIGNMENT, 1);
+            glReadPixels(0, 0, pixelWidth, pixelHeight, GL_RGBA, GL_UNSIGNED_BYTE, rawData->data());
+            
+            rt->end();
+            
+            uint32_t randomId = m_fields->m_rng.generate<uint32_t>();
+            auto tmp = utils::string::pathToString(
+                Mod::get()->getSaveDir() / fmt::format("tmp_screenshot_{}.png", randomId)
             );
-
-            f.close();
-            fs::remove(tmp);
-
-            if (buf.empty()) return;
-
-            Loader::get()->queueInMainThread([this, webhook, finalMsg, data = std::move(buf)]() {
-
+            
+            async::spawn([rawData, pixelWidth, pixelHeight, tmp, webhook, finalMsg]() -> arc::Future<void> {
+                
+                auto optData = co_await async::runtime().spawnBlocking<std::optional<std::vector<uint8_t>>>(
+                    [rawData, pixelWidth, pixelHeight, tmp]() -> std::optional<std::vector<uint8_t>> {
+                        
+                        auto flippedData = new GLubyte[pixelWidth * pixelHeight * 4];
+                        for (int i = 0; i < pixelHeight; ++i) {
+                            std::memcpy(
+                                &flippedData[i * pixelWidth * 4],
+                                &rawData->data()[(pixelHeight - i - 1) * pixelWidth * 4],
+                                pixelWidth * 4
+                            );
+                        }
+                        
+                        CCImage image{};
+                        image.m_nBitsPerComponent = 8;
+                        image.m_nWidth = pixelWidth;
+                        image.m_nHeight = pixelHeight;
+                        image.m_bHasAlpha = true;
+                        image.m_bPreMulti = false;
+                        image.m_pData = flippedData; 
+                        
+                        bool saved = image.saveToFile(tmp.c_str(), true);
+                        
+                        image.m_pData = nullptr;
+                        delete[] flippedData;
+                        
+                        if (!saved) return std::nullopt;
+                        
+                        auto readResult = utils::file::readBinary(tmp);
+                        std::error_code ec;
+                        if (fs::exists(tmp)) fs::remove(tmp, ec);
+                        
+                        if (!readResult.isOk()) return std::nullopt;
+                        return readResult.unwrap();
+                    }
+                );
+                
+                if (!optData.has_value() || optData->empty()) {
+                    co_return;
+                }
+                
                 utils::web::MultipartForm form;
                 form.param("content", finalMsg);
-                form.file("file", data, "image.png", "image/png");
-
+                form.file("file", std::move(optData.value()), "image.png", "image/png");
+                
                 auto req = utils::web::WebRequest()
-                    .bodyMultipart(form)
-                    .timeout(std::chrono::seconds(15))
-                    .post(webhook);
-
-                m_fields->m_task.spawn(std::move(req), [](utils::web::WebResponse res) {
-                    if (!res.ok()) log::error("webhook failed: {} code {}", res.errorMessage(), res.code());
-                });
-
+                .bodyMultipart(form)
+                .timeout(std::chrono::seconds(15))
+                .post(webhook);
+                
+                async::spawn(
+                    std::move(req),
+                    [](utils::web::WebResponse res) {
+                        if (!res.ok()) log::error("webhook failed: {} code {}", res.errorMessage(), res.code());
+                    }
+                );
             });
-
-        }).detach();
-    }
-};
-// hi whoever is reviewing this
-// ok so the best way to make it work was to save send delete
+        }
+    };
