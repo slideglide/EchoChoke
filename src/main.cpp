@@ -118,7 +118,7 @@ class $modify(MyPlayLayer, PlayLayer) {
             auto congratsFile = Mod::get()->getSaveDir() / "congrats.txt";
             m_fields->m_congrats = {
                 "GG WP! () beat []! 🥂",
-                "massive W on [] after <> attempts! 😭"
+                "massive W on () after <> attempts! 😭"
             };
             
             if (!fs::exists(congratsFile)) {
