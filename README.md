@@ -9,3 +9,5 @@ automatically capture your fails and send them to a discord webhook with custom 
 
 ### custom roasts
 you can find roasts.txt in your mod save folder to add your own messages. use {} to show where the percentage and level name should go"# EchoChoke" 
+
+### massive thank you to slideglide for improving the code
