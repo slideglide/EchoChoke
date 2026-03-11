@@ -1,5 +1,5 @@
 # echochoke
-automatically capture your fails and send them to a discord webhook with custom roasts
+automatically capture your fails(BY DEFAULT, ITS ONLY NEW BESTS) and send them to a discord webhook with custom roasts
 
 ### how to use
 1. create a discord webhook in your server settings
